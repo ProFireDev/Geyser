@@ -55,7 +55,7 @@ public enum EntityType {
     SQUID(SquidEntity.class, 17, 0.8f),
     RABBIT(RabbitEntity.class, 18, 0.5f, 0.4f),
     BAT(BatEntity.class, 19, 0.9f, 0.5f),
-    IRON_GOLEM(GolemEntity.class, 20, 2.7f, 1.4f),
+    IRON_GOLEM(IronGolemEntity.class, 20, 2.7f, 1.4f),
     SNOW_GOLEM(SnowGolemEntity.class, 21, 1.9f, 0.7f),
     OCELOT(OcelotEntity.class, 22, 0.35f, 0.3f),
     HORSE(HorseEntity.class, 23, 1.6f, 1.3965f),
@@ -130,7 +130,7 @@ public enum EntityType {
     THROWN_ENDERPEARL(ThrowableEntity.class, 87, 0.25f, 0.25f, 0.25f, 0f, "minecraft:ender_pearl"),
     LEASH_KNOT(LeashKnotEntity.class, 88, 0.5f, 0.375f),
     WITHER_SKULL(WitherSkullEntity.class, 89, 0.3125f),
-    BOAT(BoatEntity.class, 90, 0.7f, 1.6f, 1.6f, 0.35f),
+    BOAT(BoatEntity.class, 90, 0.6f, 1.6f, 1.6f, 0.35f),
     WITHER_SKULL_DANGEROUS(WitherSkullEntity.class, 91, 0f),
     LIGHTNING_BOLT(Entity.class, 93, 0f),
     SMALL_FIREBALL(ItemedFireballEntity.class, 94, 0.3125f),
@@ -147,7 +147,7 @@ public enum EntityType {
     EVOKER(SpellcasterIllagerEntity.class, 104, 1.95f, 0.6f, 0.6f, 0f, "minecraft:evocation_illager"),
     VEX(VexEntity.class, 105, 0.8f, 0.4f),
     ICE_BOMB(Entity.class, 106, 0f),
-    BALLOON(Entity.class, 107, 0f), //TODO
+    BALLOON(Entity.class, 107, 0f),
     PUFFERFISH(PufferFishEntity.class, 108, 0.7f, 0.7f),
     SALMON(AbstractFishEntity.class, 109, 0.5f, 0.7f),
     DROWNED(ZombieEntity.class, 110, 1.95f, 0.6f),
@@ -161,16 +161,21 @@ public enum EntityType {
     ZOGLIN(ZoglinEntity.class, 126, 1.4f, 1.3965f, 1.3965f, 0f, "minecraft:zoglin"),
     PIGLIN(PiglinEntity.class, 123, 1.95f, 0.6f, 0.6f, 0f, "minecraft:piglin"),
     PIGLIN_BRUTE(BasePiglinEntity.class, 127, 1.95f, 0.6f, 0.6f, 0f, "minecraft:piglin_brute"),
+    AXOLOTL(AxolotlEntity.class, 0, 0.42f, 0.7f, 0.7f, 0f, "minecraft:axolotl"),
+    GLOW_SQUID(GlowSquidEntity.class, 0, 0.8f, 0.8f, 0.8f, 0f, "minecraft:glow_squid"),
+    GOAT(GoatEntity.class, 0, 1.3f, 0.9f, 0.9f, 0f, "minecraft:goat"),
+    MARKER(Entity.class, 0, 0, 0, 0, 0, "minecraft:marker"), // Only should be used for ALL_JAVA_IDENTIFIERS
 
     /**
      * Item frames are handled differently since they are a block in Bedrock.
      */
     ITEM_FRAME(ItemFrameEntity.class, 0, 0, 0),
+    GLOW_ITEM_FRAME(ItemFrameEntity.class, 0, 0, 0),
 
     /**
-     * Not an entity in Bedrock, so we replace it with a Pillager
+     * Not an entity in Bedrock, so we replace it with an evoker
      */
-    ILLUSIONER(AbstractIllagerEntity.class, 114, 1.8f, 0.6f, 0.6f, 1.62f, "minecraft:pillager"),
+    ILLUSIONER(SpellcasterIllagerEntity.class, 104, 1.8f, 0.6f, 0.6f, 1.62f, "minecraft:evocation_illager"),
 
     /**
      * Not an entity in Bedrock, but used for the Ender Dragon's multiple hitboxes

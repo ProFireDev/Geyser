@@ -28,7 +28,6 @@ package org.geysermc.connector.registry.type;
 import lombok.Builder;
 import lombok.Value;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 @Builder
@@ -45,7 +44,6 @@ public class BlockMapping {
 
     double hardness;
     boolean canBreakWithHand;
-    @Nonnull String toolType;
     /**
      * The index of this collision in collision.json
      */
@@ -57,6 +55,18 @@ public class BlockMapping {
      */
     public String getCleanJavaIdentifier() {
         return javaIdentifier.split("\\[")[0];
+    }
+
+    /**
+     * @return the corresponding Java identifier for this item
+     */
+    public String getItemIdentifier() {
+        if (pickItem != null && !pickItem.equals("minecraft:air")) {
+            // Spawners can have air as their pick item which we are not interested in.
+            return pickItem;
+        }
+
+        return getCleanJavaIdentifier();
     }
 
     /**

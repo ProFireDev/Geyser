@@ -39,11 +39,13 @@ public class SpellcasterIllagerEntity extends AbstractIllagerEntity {
 
     public SpellcasterIllagerEntity(long entityId, long geyserId, EntityType entityType, Vector3f position, Vector3f motion, Vector3f rotation) {
         super(entityId, geyserId, entityType, position, motion, rotation);
+        // OptionalPack usage
+        metadata.getFlags().setFlag(EntityFlag.BRIBED, this.entityType == EntityType.ILLUSIONER);
     }
 
     @Override
     public void updateBedrockMetadata(EntityMetadata entityMetadata, GeyserSession session) {
-        if (entityMetadata.getId() == 16) {
+        if (entityMetadata.getId() == 17) {
             int spellType = (int) (byte) entityMetadata.getValue();
             // Summon vex, attack, or wololo
             metadata.getFlags().setFlag(EntityFlag.CASTING, spellType == 1 || spellType == 2 || spellType == 3);
