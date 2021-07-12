@@ -23,28 +23,31 @@
  * @link https://github.com/GeyserMC/Geyser
  */
 
-package org.geysermc.connector.network.translators.java.entity;
+package org.geysermc.connector.entity.living.monster;
 
-import com.github.steveice10.mc.protocol.packet.ingame.server.entity.ServerEntityPropertiesPacket;
-import org.geysermc.connector.entity.Entity;
-import org.geysermc.connector.entity.LivingEntity;
+import com.github.steveice10.mc.protocol.data.game.entity.metadata.EntityMetadata;
+import com.nukkitx.math.vector.Vector3f;
+import com.nukkitx.protocol.bedrock.data.entity.EntityData;
+import org.geysermc.connector.entity.living.FlyingEntity;
+import org.geysermc.connector.entity.type.EntityType;
 import org.geysermc.connector.network.session.GeyserSession;
-import org.geysermc.connector.network.translators.PacketTranslator;
-import org.geysermc.connector.network.translators.Translator;
 
-@Translator(packet = ServerEntityPropertiesPacket.class)
-public class JavaEntityPropertiesTranslator extends PacketTranslator<ServerEntityPropertiesPacket> {
+public class PhantomEntity extends FlyingEntity {
+    public PhantomEntity(long entityId, long geyserId, EntityType entityType, Vector3f position, Vector3f motion, Vector3f rotation) {
+        super(entityId, geyserId, entityType, position, motion, rotation);
+    }
 
     @Override
-    public void translate(ServerEntityPropertiesPacket packet, GeyserSession session) {
-        Entity entity;
-        if (packet.getEntityId() == session.getPlayerEntity().getEntityId()) {
-            entity = session.getPlayerEntity();
-        } else {
-            entity = session.getEntityCache().getEntityByJavaId(packet.getEntityId());
-        }
-        if (!(entity instanceof LivingEntity)) return;
+    public void updateBedrockMetadata(EntityMetadata entityMetadata, GeyserSession session) {
+        if (entityMetadata.getId() == 16) { // Size
+            int size = (int) entityMetadata.getValue();
+            float modelScale = 1f + 0.15f * size;
+            float boundsScale = (1f + (0.2f * size) / EntityType.PHANTOM.getWidth()) / modelScale;
 
-        ((LivingEntity) entity).updateBedrockAttributes(session, packet.getAttributes());
+            metadata.put(EntityData.BOUNDING_BOX_WIDTH, boundsScale * EntityType.PHANTOM.getWidth());
+            metadata.put(EntityData.BOUNDING_BOX_HEIGHT, boundsScale * EntityType.PHANTOM.getHeight());
+            metadata.put(EntityData.SCALE, modelScale);
+        }
+        super.updateBedrockMetadata(entityMetadata, session);
     }
 }

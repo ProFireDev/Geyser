@@ -23,31 +23,33 @@
  * @link https://github.com/GeyserMC/Geyser
  */
 
-package org.geysermc.connector.entity.living.animal;
+package org.geysermc.connector.network.translators.item.translators.nbt;
 
-import com.github.steveice10.mc.protocol.data.game.entity.metadata.EntityMetadata;
-import com.nukkitx.math.vector.Vector3f;
-import com.nukkitx.protocol.bedrock.data.entity.EntityFlag;
-import org.geysermc.connector.entity.type.EntityType;
+import com.github.steveice10.opennbt.tag.builtin.ByteTag;
+import com.github.steveice10.opennbt.tag.builtin.CompoundTag;
+import com.github.steveice10.opennbt.tag.builtin.StringTag;
 import org.geysermc.connector.network.session.GeyserSession;
+import org.geysermc.connector.network.translators.ItemRemapper;
 import org.geysermc.connector.network.translators.item.ItemEntry;
+import org.geysermc.connector.network.translators.item.NbtItemStackTranslator;
+import org.geysermc.connector.utils.LocaleUtils;
 
-public class PigEntity extends AnimalEntity {
+@ItemRemapper
+public class AxolotlBucketTranslator extends NbtItemStackTranslator {
 
-    public PigEntity(long entityId, long geyserId, EntityType entityType, Vector3f position, Vector3f motion, Vector3f rotation) {
-        super(entityId, geyserId, entityType, position, motion, rotation);
+    @Override
+    public void translateToBedrock(GeyserSession session, CompoundTag itemTag, ItemEntry itemEntry) {
+        // Bedrock Edition displays the properties of the axolotl. Java does not.
+        // To work around this, set the custom name to the Axolotl translation and it's displayed correctly
+        itemTag.put(new ByteTag("AppendCustomName", (byte) 1));
+        itemTag.put(new StringTag("CustomName", LocaleUtils.getLocaleString("entity.minecraft.axolotl", session.getLocale())));
+        // Boilerplate required so the nametag does not appear as "Bucket of "
+        itemTag.put(new StringTag("ColorID", ""));
+        itemTag.put(new StringTag("BodyID", ""));
     }
 
     @Override
-    public void updateBedrockMetadata(EntityMetadata entityMetadata, GeyserSession session) {
-        if (entityMetadata.getId() == 17) {
-            metadata.getFlags().setFlag(EntityFlag.SADDLED, (boolean) entityMetadata.getValue());
-        }
-        super.updateBedrockMetadata(entityMetadata, session);
-    }
-
-    @Override
-    public boolean canEat(GeyserSession session, String javaIdentifierStripped, ItemEntry itemEntry) {
-        return javaIdentifierStripped.equals("carrot") || javaIdentifierStripped.equals("potato") || javaIdentifierStripped.equals("beetroot");
+    public boolean acceptItem(ItemEntry itemEntry) {
+        return itemEntry.getJavaIdentifier().equals("minecraft:axolotl_bucket");
     }
 }
