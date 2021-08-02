@@ -54,7 +54,7 @@ public class CollisionManager {
     private final GeyserSession session;
 
     @Getter
-    private BoundingBox playerBoundingBox;
+    private final BoundingBox playerBoundingBox;
 
     /**
      * Whether the player is inside scaffolding
@@ -105,26 +105,16 @@ public class CollisionManager {
     }
 
     /**
-     * Updates the stored bounding box without passing a position, which currently just changes the height depending on if the player is sneaking.
+     * Updates the height of the stored bounding box
      */
     public void updatePlayerBoundingBox() {
-        if (playerBoundingBox == null) {
-            Vector3f playerPosition;
-            if (session.getPlayerEntity() == null) {
-                // Temporary position to prevent NullPointerException
-                playerPosition = Vector3f.ZERO;
-            } else {
-                playerPosition = session.getPlayerEntity().getPosition();
-            }
-            playerBoundingBox = new BoundingBox(playerPosition.getX(), playerPosition.getY() + 0.9, playerPosition.getZ(),
-                    EntityType.PLAYER.getWidth(), EntityType.PLAYER.getHeight(), EntityType.PLAYER.getLength());
-        } else {
-            // According to the Minecraft Wiki, when sneaking:
-            // - In Bedrock Edition, the height becomes 1.65 blocks, allowing movement through spaces as small as 1.75 (2 - 1⁄4) blocks high.
-            // - In Java Edition, the height becomes 1.5 blocks.
-            // Other instances have the player's bounding box become as small as 0.6 or 0.2.
-            playerBoundingBox.setSizeY(session.getPlayerEntity().getMetadata().getFloat(EntityData.BOUNDING_BOX_HEIGHT));
-        }
+        // According to the Minecraft Wiki, when sneaking:
+        // - In Bedrock Edition, the height becomes 1.65 blocks, allowing movement through spaces as small as 1.75 (2 - 1⁄4) blocks high.
+        // - In Java Edition, the height becomes 1.5 blocks.
+        // Other instances have the player's bounding box become as small as 0.6 or 0.2.
+        double playerHeight = session.getPlayerEntity().getMetadata().getFloat(EntityData.BOUNDING_BOX_HEIGHT);
+        playerBoundingBox.setMiddleY(playerBoundingBox.getMiddleY() - (playerBoundingBox.getSizeY() / 2.0) + (playerHeight / 2.0));
+        playerBoundingBox.setSizeY(playerHeight);
     }
 
     /**
@@ -230,23 +220,21 @@ public class CollisionManager {
 
         // Used when correction code needs to be run before the main correction
         for (Vector3i blockPos : collidableBlocks) {
-            BlockCollision blockCollision = BlockUtils.getCollisionAt(
-                    session, blockPos.getX(), blockPos.getY(), blockPos.getZ()
-            );
+            BlockCollision blockCollision = BlockUtils.getCollisionAt(session, blockPos);
             if (blockCollision != null) {
                 blockCollision.beforeCorrectPosition(playerBoundingBox);
+                blockCollision.setPosition(null);
             }
         }
 
         // Main correction code
         for (Vector3i blockPos : collidableBlocks) {
-            BlockCollision blockCollision = BlockUtils.getCollisionAt(
-                    session, blockPos.getX(), blockPos.getY(), blockPos.getZ()
-            );
+            BlockCollision blockCollision = BlockUtils.getCollisionAt(session, blockPos);
             if (blockCollision != null) {
                 if (!blockCollision.correctPosition(session, playerBoundingBox)) {
                     return false;
                 }
+                blockCollision.setPosition(null);
             }
         }
 
@@ -261,13 +249,20 @@ public class CollisionManager {
      */
     public boolean isUnderSlab() {
         Vector3i position = session.getPlayerEntity().getPosition().toInt();
-        BlockCollision collision = BlockUtils.getCollisionAt(session, position.getX(), position.getY(), position.getZ());
+        BlockCollision collision = BlockUtils.getCollisionAt(session, position);
         if (collision != null) {
             // Determine, if the player's bounding box *were* at full height, if it would intersect with the block
             // at the current location.
+            double originalY = playerBoundingBox.getMiddleY();
+            double originalHeight = playerBoundingBox.getSizeY();
+            double standingY = originalY - (originalHeight / 2.0) + (EntityType.PLAYER.getHeight() / 2.0);
+
             playerBoundingBox.setSizeY(EntityType.PLAYER.getHeight());
+            playerBoundingBox.setMiddleY(standingY);
             boolean result = collision.checkIntersection(playerBoundingBox);
-            playerBoundingBox.setSizeY(session.getPlayerEntity().getMetadata().getFloat(EntityData.BOUNDING_BOX_HEIGHT));
+            collision.setPosition(null);
+            playerBoundingBox.setSizeY(originalHeight);
+            playerBoundingBox.setMiddleY(originalY);
             return result;
         }
         return false;
