@@ -28,7 +28,6 @@ package org.geysermc.connector.registry.populator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import com.nukkitx.nbt.*;
-import com.nukkitx.protocol.bedrock.v440.Bedrock_v440;
 import com.nukkitx.protocol.bedrock.v448.Bedrock_v448;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -44,6 +43,7 @@ import org.geysermc.connector.registry.type.BlockMapping;
 import org.geysermc.connector.registry.type.BlockMappings;
 import org.geysermc.connector.utils.BlockUtils;
 import org.geysermc.connector.utils.FileUtils;
+import org.geysermc.connector.utils.PistonBehavior;
 
 import java.io.DataInputStream;
 import java.io.InputStream;
@@ -65,29 +65,9 @@ public class BlockRegistryPopulator {
     static {
         ImmutableMap.Builder<String, BiFunction<String, NbtMapBuilder, String>> stateMapperBuilder = ImmutableMap.<String, BiFunction<String, NbtMapBuilder, String>>builder()
                 .put("1_17_10", (bedrockIdentifier, statesBuilder) -> null);
-        if (!GeyserConnector.getInstance().getConfig().isExtendedWorldHeight()) {
-            stateMapperBuilder.put("1_17_0", (bedrockIdentifier, statesBuilder) -> {
-                if (bedrockIdentifier.contains("candle")) {
-                    // Replace candles with sea pickles or cake
-                    if (bedrockIdentifier.contains("cake")) {
-                        statesBuilder.remove("lit");
-                        statesBuilder.putInt("bite_counter", 0);
-                        return "minecraft:cake";
-                    } else {
-                        statesBuilder.put("cluster_count", statesBuilder.remove("candles"));
-                        statesBuilder.putBoolean("dead_bit", ((byte) (statesBuilder.remove("lit"))) != 0);
-                        return "minecraft:sea_pickle";
-                    }
-                }
-                return null;
-            });
-        }
         STATE_MAPPER = stateMapperBuilder.build();
 
         PALETTE_VERSIONS = new Object2IntOpenHashMap<>();
-        if (!GeyserConnector.getInstance().getConfig().isExtendedWorldHeight()) {
-            PALETTE_VERSIONS.put("1_17_0", Bedrock_v440.V440_CODEC.getProtocolVersion());
-        }
         PALETTE_VERSIONS.put("1_17_10", Bedrock_v448.V448_CODEC.getProtocolVersion());
     }
 
@@ -133,6 +113,7 @@ public class BlockRegistryPopulator {
             int commandBlockRuntimeId = -1;
             int javaRuntimeId = -1;
             int waterRuntimeId = -1;
+            int movingBlockRuntimeId = -1;
             Iterator<Map.Entry<String, JsonNode>> blocksIterator = BLOCKS_JSON.fields();
 
             BiFunction<String, NbtMapBuilder, String> stateMapper = STATE_MAPPER.getOrDefault(palette.getKey(), (i, s) -> null);
@@ -157,15 +138,10 @@ public class BlockRegistryPopulator {
                 }
 
                 switch (javaId) {
-                    case "minecraft:air":
-                        airRuntimeId = bedrockRuntimeId;
-                        break;
-                    case "minecraft:water[level=0]":
-                        waterRuntimeId = bedrockRuntimeId;
-                        break;
-                    case "minecraft:command_block[conditional=false,facing=north]":
-                        commandBlockRuntimeId = bedrockRuntimeId;
-                        break;
+                    case "minecraft:air" -> airRuntimeId = bedrockRuntimeId;
+                    case "minecraft:water[level=0]" -> waterRuntimeId = bedrockRuntimeId;
+                    case "minecraft:command_block[conditional=false,facing=north]" -> commandBlockRuntimeId = bedrockRuntimeId;
+                    case "minecraft:moving_piston[facing=north,type=normal]" -> movingBlockRuntimeId = bedrockRuntimeId;
                 }
 
                 if (javaId.contains("jigsaw")) {
@@ -209,6 +185,11 @@ public class BlockRegistryPopulator {
             }
             builder.bedrockAirId(airRuntimeId);
 
+            if (movingBlockRuntimeId == -1) {
+                throw new AssertionError("Unable to find moving block in palette");
+            }
+            builder.bedrockMovingBlockId(movingBlockRuntimeId);
+
             // Loop around again to find all item frame runtime IDs
             for (Object2IntMap.Entry<NbtMap> entry : blockStateOrderedMap.object2IntEntrySet()) {
                 String name = entry.getKey().getString("name");
@@ -248,6 +229,8 @@ public class BlockRegistryPopulator {
         int cobwebBlockId = -1;
         int furnaceRuntimeId = -1;
         int furnaceLitRuntimeId = -1;
+        int honeyBlockRuntimeId = -1;
+        int slimeBlockRuntimeId = -1;
         int spawnerRuntimeId = -1;
         int uniqueJavaId = -1;
         int waterRuntimeId = -1;
@@ -279,6 +262,24 @@ public class BlockRegistryPopulator {
             JsonNode pickItemNode = entry.getValue().get("pick_item");
             if (pickItemNode != null) {
                 builder.pickItem(pickItemNode.textValue().intern());
+            }
+
+            if (javaId.equals("minecraft:obsidian") || javaId.equals("minecraft:crying_obsidian") || javaId.startsWith("minecraft:respawn_anchor")) {
+                builder.pistonBehavior(PistonBehavior.BLOCK);
+            } else {
+                JsonNode pistonBehaviorNode = entry.getValue().get("piston_behavior");
+                if (pistonBehaviorNode != null) {
+                    builder.pistonBehavior(PistonBehavior.getByName(pistonBehaviorNode.textValue()));
+                } else {
+                    builder.pistonBehavior(PistonBehavior.NORMAL);
+                }
+            }
+
+            JsonNode hasBlockEntityNode = entry.getValue().get("has_block_entity");
+            if (hasBlockEntityNode != null) {
+                builder.isBlockEntity(hasBlockEntityNode.booleanValue());
+            } else {
+                builder.isBlockEntity(false);
             }
 
             BlockStateValues.storeBlockStateValues(entry.getKey(), javaRuntimeId, entry.getValue());
@@ -320,6 +321,10 @@ public class BlockRegistryPopulator {
 
             } else if ("minecraft:water[level=0]".equals(javaId)) {
                 waterRuntimeId = javaRuntimeId;
+            } else if (javaId.equals("minecraft:honey_block")) {
+                honeyBlockRuntimeId = javaRuntimeId;
+            } else if (javaId.equals("minecraft:slime_block")) {
+                slimeBlockRuntimeId = javaRuntimeId;
             }
         }
         if (bellBlockId == -1) {
@@ -341,6 +346,16 @@ public class BlockRegistryPopulator {
             throw new AssertionError("Unable to find lit furnace in palette");
         }
         BlockStateValues.JAVA_FURNACE_LIT_ID = furnaceLitRuntimeId;
+
+        if (honeyBlockRuntimeId == -1) {
+            throw new AssertionError("Unable to find honey block in palette");
+        }
+        BlockStateValues.JAVA_HONEY_BLOCK_ID = honeyBlockRuntimeId;
+
+        if (slimeBlockRuntimeId == -1) {
+            throw new AssertionError("Unable to find slime block in palette");
+        }
+        BlockStateValues.JAVA_SLIME_BLOCK_ID = slimeBlockRuntimeId;
 
         if (spawnerRuntimeId == -1) {
             throw new AssertionError("Unable to find spawner in palette");
@@ -371,14 +386,9 @@ public class BlockRegistryPopulator {
                 Map.Entry<String, JsonNode> stateEntry = statesIterator.next();
                 JsonNode stateValue = stateEntry.getValue();
                 switch (stateValue.getNodeType()) {
-                    case BOOLEAN:
-                        statesBuilder.putBoolean(stateEntry.getKey(), stateValue.booleanValue());
-                        continue;
-                    case STRING:
-                        statesBuilder.putString(stateEntry.getKey(), stateValue.textValue());
-                        continue;
-                    case NUMBER:
-                        statesBuilder.putInt(stateEntry.getKey(), stateValue.intValue());
+                    case BOOLEAN -> statesBuilder.putBoolean(stateEntry.getKey(), stateValue.booleanValue());
+                    case STRING -> statesBuilder.putString(stateEntry.getKey(), stateValue.textValue());
+                    case NUMBER -> statesBuilder.putInt(stateEntry.getKey(), stateValue.intValue());
                 }
             }
         }

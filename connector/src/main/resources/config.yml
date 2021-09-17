@@ -59,7 +59,6 @@ remote:
   forward-hostname: false
 
 # Allows the overworld world height to be extended from 0 - 255 to -64 - 319. This option cannot be changed during a reload.
-# 1.17.0-1.17.2 Bedrock clients cannot connect with this option enabled.
 # Performance issues and/or additional bugs may occur for Bedrock clients as this is an experimental toggle on their end.
 extended-world-height: false
 
@@ -193,7 +192,7 @@ enable-proxy-connections: false
 
 # The internet supports a maximum MTU of 1492 but could cause issues with packet fragmentation.
 # 1400 is the default.
-# mtu: 1400
+mtu: 1400
 
 # Whether to connect directly into the Java server without creating a TCP connection.
 # This should only be disabled if a plugin that interfaces with packets or the network does not work correctly with Geyser.
