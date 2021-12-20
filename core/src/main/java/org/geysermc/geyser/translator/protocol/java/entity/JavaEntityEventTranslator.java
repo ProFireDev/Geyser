@@ -47,12 +47,7 @@ public class JavaEntityEventTranslator extends PacketTranslator<ClientboundEntit
 
     @Override
     public void translate(GeyserSession session, ClientboundEntityEventPacket packet) {
-        Entity entity;
-        if (packet.getEntityId() == session.getPlayerEntity().getEntityId()) {
-            entity = session.getPlayerEntity();
-        } else {
-            entity = session.getEntityCache().getEntityByJavaId(packet.getEntityId());
-        }
+        Entity entity = session.getEntityCache().getEntityByJavaId(packet.getEntityId());
         if (entity == null)
             return;
 
@@ -124,8 +119,8 @@ public class JavaEntityEventTranslator extends PacketTranslator<ClientboundEntit
                 // Player is pulled from a fishing rod
                 // The physics of this are clientside on Java
                 FishingHookEntity fishingHook = (FishingHookEntity) entity;
-                if (fishingHook.isOwnerSessionPlayer()) {
-                    Entity hookOwner = session.getEntityCache().getEntityByGeyserId(fishingHook.getBedrockTargetId());
+                if (fishingHook.getBedrockTargetId() == session.getPlayerEntity().getGeyserId()) {
+                    Entity hookOwner = session.getEntityCache().getEntityByGeyserId(fishingHook.getBedrockOwnerId());
                     if (hookOwner != null) {
                         // https://minecraft.gamepedia.com/Fishing_Rod#Hooking_mobs_and_other_entities
                         SetEntityMotionPacket motionPacket = new SetEntityMotionPacket();

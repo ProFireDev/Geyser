@@ -123,14 +123,6 @@ public class PlayerEntity extends LivingEntity {
 
         setFlagsDirty(false);
 
-        long linkedEntityId = session.getEntityCache().getCachedPlayerEntityLink(entityId);
-        if (linkedEntityId != -1) {
-            Entity linkedEntity = session.getEntityCache().getEntityByJavaId(linkedEntityId);
-            if (linkedEntity != null) {
-                addPlayerPacket.getEntityLinks().add(new EntityLinkData(linkedEntity.getGeyserId(), geyserId, EntityLinkData.Type.RIDER, false, false));
-            }
-        }
-
         valid = true;
         session.sendUpstreamPacket(addPlayerPacket);
     }
@@ -351,7 +343,7 @@ public class PlayerEntity extends LivingEntity {
         if (team != null) {
             if (team.isVisibleFor(session.getPlayerEntity().getUsername())) {
                 TeamColor color = team.getColor();
-                String chatColor = MessageTranslator.toChatColor(color);;
+                String chatColor = MessageTranslator.toChatColor(color);
                 // We have to emulate what modern Java text already does for us and add the color to each section
                 String prefix = team.getCurrentData().getPrefix();
                 String suffix = team.getCurrentData().getSuffix();
