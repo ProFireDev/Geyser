@@ -60,7 +60,7 @@ import java.util.UUID;
 public class Entity {
     protected final GeyserSession session;
 
-    protected long entityId;
+    protected int entityId;
     protected final long geyserId;
     protected UUID uuid;
 
@@ -81,6 +81,9 @@ public class Entity {
 
     protected EntityDefinition<?> definition;
 
+    /**
+     * Indicates if the entity has been initialized and spawned
+     */
     protected boolean valid;
 
     /* Metadata about this specific entity */
@@ -112,7 +115,7 @@ public class Entity {
     @Setter(AccessLevel.PROTECTED) // For players
     private boolean flagsDirty = false;
 
-    public Entity(GeyserSession session, long entityId, long geyserId, UUID uuid, EntityDefinition<?> definition, Vector3f position, Vector3f motion, float yaw, float pitch, float headYaw) {
+    public Entity(GeyserSession session, int entityId, long geyserId, UUID uuid, EntityDefinition<?> definition, Vector3f position, Vector3f motion, float yaw, float pitch, float headYaw) {
         this.session = session;
 
         this.entityId = entityId;
@@ -372,9 +375,7 @@ public class Entity {
     /**
      * Usually used for bounding box and not animation.
      */
-    public void setPose(EntityMetadata<Pose, ?> entityMetadata) {
-        Pose pose = entityMetadata.getValue();
-
+    public void setPose(Pose pose) {
         setFlag(EntityFlag.SLEEPING, pose.equals(Pose.SLEEPING));
         // Triggered when crawling
         setFlag(EntityFlag.SWIMMING, pose.equals(Pose.SWIMMING));
@@ -390,13 +391,15 @@ public class Entity {
         setBoundingBoxWidth(definition.width());
     }
 
-    public void setBoundingBoxHeight(float height) {
+    public boolean setBoundingBoxHeight(float height) {
         if (height != boundingBoxHeight) {
             boundingBoxHeight = height;
             dirtyMetadata.put(EntityData.BOUNDING_BOX_HEIGHT, boundingBoxHeight);
 
             updatePassengerOffsets();
+            return true;
         }
+        return false;
     }
 
     public void setBoundingBoxWidth(float width) {

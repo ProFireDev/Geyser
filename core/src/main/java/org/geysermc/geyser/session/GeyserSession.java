@@ -302,6 +302,12 @@ public class GeyserSession implements GeyserConnection, CommandSender {
      */
     @Setter
     private String dimension = DimensionUtils.OVERWORLD;
+    /**
+     * Whether piglins and hoglins are safe from conversion in this dimension.
+     * This controls if they have the shaking effect applied in the dimension.
+     */
+    @Setter
+    private boolean dimensionPiglinSafe;
 
     @Setter
     private int breakingBlock;
@@ -1053,16 +1059,24 @@ public class GeyserSession implements GeyserConnection, CommandSender {
     }
 
     private void setSneakingPose(boolean sneaking) {
-        this.pose = sneaking ? Pose.SNEAKING : Pose.STANDING;
-        playerEntity.setBoundingBoxHeight(sneaking ? 1.5f : playerEntity.getDefinition().height());
+        if (this.pose == Pose.SNEAKING && !sneaking) {
+            this.pose = Pose.STANDING;
+            playerEntity.setBoundingBoxHeight(playerEntity.getDefinition().height());
+        } else if (sneaking) {
+            this.pose = Pose.SNEAKING;
+            playerEntity.setBoundingBoxHeight(1.5f);
+        }
         playerEntity.setFlag(EntityFlag.SNEAKING, sneaking);
-
-        collisionManager.updatePlayerBoundingBox();
     }
 
     public void setSwimming(boolean swimming) {
-        this.pose = swimming ? Pose.SWIMMING : Pose.STANDING;
-        playerEntity.setBoundingBoxHeight(swimming ? 0.6f : playerEntity.getDefinition().height());
+        if (swimming) {
+            this.pose = Pose.SWIMMING;
+            playerEntity.setBoundingBoxHeight(0.6f);
+        } else {
+            this.pose = Pose.STANDING;
+            playerEntity.setBoundingBoxHeight(playerEntity.getDefinition().height());
+        }
         playerEntity.setFlag(EntityFlag.SWIMMING, swimming);
         playerEntity.updateBedrockMetadata();
     }
@@ -1085,7 +1099,7 @@ public class GeyserSession implements GeyserConnection, CommandSender {
     public AttributeData adjustSpeed() {
         AttributeData currentPlayerSpeed = playerEntity.getAttributes().get(GeyserAttributeType.MOVEMENT_SPEED);
         if (currentPlayerSpeed != null) {
-            if ((pose.equals(Pose.SNEAKING) && !sneaking && collisionManager.isUnderSlab()) ||
+            if ((pose.equals(Pose.SNEAKING) && !sneaking && collisionManager.mustPlayerSneakHere()) ||
                     (!swimmingInWater && playerEntity.getFlag(EntityFlag.SWIMMING) && !collisionManager.isPlayerInWater())) {
                 // Either of those conditions means that Bedrock goes zoom when they shouldn't be
                 AttributeData speedAttribute = GeyserAttributeType.MOVEMENT_SPEED.getAttribute(originalSpeedAttribute / 3.32f);
