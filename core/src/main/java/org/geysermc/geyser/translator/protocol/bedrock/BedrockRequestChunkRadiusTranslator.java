@@ -25,43 +25,23 @@
 
 package org.geysermc.geyser.translator.protocol.bedrock;
 
-import com.github.steveice10.mc.protocol.packet.ingame.serverbound.ServerboundChatPacket;
-import com.nukkitx.protocol.bedrock.packet.TextPacket;
+import com.nukkitx.protocol.bedrock.packet.RequestChunkRadiusPacket;
 import org.geysermc.geyser.session.GeyserSession;
-import org.geysermc.geyser.text.ChatColor;
 import org.geysermc.geyser.translator.protocol.PacketTranslator;
 import org.geysermc.geyser.translator.protocol.Translator;
-import org.geysermc.geyser.translator.text.MessageTranslator;
 
-@Translator(packet = TextPacket.class)
-public class BedrockTextTranslator extends PacketTranslator<TextPacket> {
+/**
+ * Sent when the client updates its desired render distance.
+ */
+@Translator(packet = RequestChunkRadiusPacket.class)
+public class BedrockRequestChunkRadiusTranslator extends PacketTranslator<RequestChunkRadiusPacket> {
 
     @Override
-    public void translate(GeyserSession session, TextPacket packet) {
-        String message = packet.getMessage();
+    public void translate(GeyserSession session, RequestChunkRadiusPacket packet) {
+        session.setClientRenderDistance(packet.getRadius());
 
-        if (message.isBlank()) {
-            // Java Edition (as of 1.17.1) just doesn't pass on these messages, so... we won't either!
-            return;
+        if (session.isLoggedIn()) {
+            session.sendJavaClientSettings();
         }
-
-        if (message.indexOf(ChatColor.ESCAPE) != -1) {
-            // Filter out all escape characters - Java doesn't let you type these
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < message.length(); i++) {
-                char c = message.charAt(i);
-                if (c != ChatColor.ESCAPE) {
-                    builder.append(c);
-                }
-            }
-            message = builder.toString();
-        }
-
-        if (MessageTranslator.isTooLong(message, session)) {
-            return;
-        }
-
-        ServerboundChatPacket chatPacket = new ServerboundChatPacket(message);
-        session.sendDownstreamPacket(chatPacket);
     }
 }
