@@ -112,6 +112,7 @@ import org.geysermc.geyser.util.DimensionUtils;
 import org.geysermc.geyser.util.LoginEncryptionUtils;
 import org.geysermc.geyser.util.MathUtils;
 
+import javax.annotation.Nonnull;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -125,13 +126,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Getter
 public class GeyserSession implements GeyserConnection, CommandSender {
 
-    private final GeyserImpl geyser;
-    private final UpstreamSession upstream;
+    private final @Nonnull GeyserImpl geyser;
+    private final @Nonnull UpstreamSession upstream;
     /**
      * The loop where all packets and ticking is processed to prevent concurrency issues.
      * If this is manually called, ensure that any exceptions are properly handled.
      */
-    private final EventLoop eventLoop;
+    private final @Nonnull EventLoop eventLoop;
     private TcpSession downstream;
     @Setter
     private AuthData authData;
@@ -547,11 +548,14 @@ public class GeyserSession implements GeyserConnection, CommandSender {
         }
 
         bedrockServerSession.addDisconnectHandler(disconnectReason -> {
-            InetAddress address = bedrockServerSession.getRealAddress().getAddress();
-            geyser.getLogger().info(GeyserLocale.getLocaleStringLog("geyser.network.disconnect", address, disconnectReason));
+            String message = switch (disconnectReason) {
+                // A generic message that just means the player quit normally.
+                case CLOSED_BY_REMOTE_PEER -> GeyserLocale.getLocaleStringLog("geyser.network.disconnect.closed_by_remote_peer");
+                case TIMED_OUT -> GeyserLocale.getLocaleStringLog("geyser.network.disconnect.timed_out");
+                default -> disconnectReason.name();
+            };
 
-            disconnect(disconnectReason.name());
-            geyser.getSessionManager().removeSession(this);
+            disconnect(message);
         });
 
         this.remoteAddress = geyser.getConfig().getRemote().getAddress();
@@ -637,7 +641,6 @@ public class GeyserSession implements GeyserConnection, CommandSender {
         loggingIn = true;
 
         // Use a future to prevent timeouts as all the authentication is handled sync
-        // This will be changed with the new protocol library.
         CompletableFuture.supplyAsync(() -> {
             try {
                 if (password != null && !password.isEmpty()) {
@@ -694,10 +697,58 @@ public class GeyserSession implements GeyserConnection, CommandSender {
         });
     }
 
+    public void authenticateWithRefreshToken(String refreshToken) {
+        if (loggedIn) {
+            geyser.getLogger().severe(GeyserLocale.getLocaleStringLog("geyser.auth.already_loggedin", getAuthData().name()));
+            return;
+        }
+
+        loggingIn = true;
+
+        CompletableFuture.supplyAsync(() -> {
+            MsaAuthenticationService service = new MsaAuthenticationService(GeyserImpl.OAUTH_CLIENT_ID);
+            service.setRefreshToken(refreshToken);
+            try {
+                service.login();
+            } catch (RequestException e) {
+                geyser.getLogger().error("Error while attempting to use refresh token for " + name() + "!", e);
+                return Boolean.FALSE;
+            }
+
+            GameProfile profile = service.getSelectedProfile();
+            if (profile == null) {
+                // Java account is offline
+                disconnect(GeyserLocale.getPlayerLocaleString("geyser.network.remote.invalid_account", clientData.getLanguageCode()));
+                return null;
+            }
+
+            protocol = new MinecraftProtocol(profile, service.getAccessToken());
+            geyser.saveRefreshToken(name(), service.getRefreshToken());
+            return Boolean.TRUE;
+        }).whenComplete((successful, ex) -> {
+            if (this.closed) {
+                return;
+            }
+            if (successful == Boolean.FALSE) {
+                // The player is waiting for a spawn packet, so let's spawn them in now to show them forms
+                connect();
+                // Will be cached for after login
+                LoginEncryptionUtils.buildAndShowTokenExpiredWindow(this);
+                return;
+            }
+
+            connectDownstream();
+        });
+    }
+
+    public void authenticateWithMicrosoftCode() {
+        authenticateWithMicrosoftCode(false);
+    }
+
     /**
      * Present a form window to the user asking to log in with another web browser
      */
-    public void authenticateWithMicrosoftCode() {
+    public void authenticateWithMicrosoftCode(boolean offlineAccess) {
         if (loggedIn) {
             geyser.getLogger().severe(GeyserLocale.getLocaleStringLog("geyser.auth.already_loggedin", getAuthData().name()));
             return;
@@ -719,7 +770,7 @@ public class GeyserSession implements GeyserConnection, CommandSender {
         if (task.getAuthentication().isDone()) {
             onMicrosoftLoginComplete(task);
         } else {
-            task.getCode().whenComplete((response, ex) -> {
+            task.getCode(offlineAccess).whenComplete((response, ex) -> {
                 boolean connected = !closed;
                 if (ex != null) {
                     if (connected) {
@@ -735,6 +786,9 @@ public class GeyserSession implements GeyserConnection, CommandSender {
         }
     }
 
+    /**
+     * If successful, also begins connecting to the Java server.
+     */
     public boolean onMicrosoftLoginComplete(PendingMicrosoftAuthentication.AuthenticationTask task) {
         if (closed) {
             return false;
@@ -745,7 +799,8 @@ public class GeyserSession implements GeyserConnection, CommandSender {
             geyser.getLogger().error("Failed to log in with Microsoft code!", ex);
             disconnect(ex.toString());
         } else {
-            GameProfile selectedProfile = task.getMsaAuthenticationService().getSelectedProfile();
+            MsaAuthenticationService service = task.getMsaAuthenticationService();
+            GameProfile selectedProfile = service.getSelectedProfile();
             if (selectedProfile == null) {
                 disconnect(GeyserLocale.getPlayerLocaleString(
                         "geyser.network.remote.invalid_account",
@@ -754,9 +809,12 @@ public class GeyserSession implements GeyserConnection, CommandSender {
             } else {
                 this.protocol = new MinecraftProtocol(
                         selectedProfile,
-                        task.getMsaAuthenticationService().getAccessToken()
+                        service.getAccessToken()
                 );
                 connectDownstream();
+
+                // Save our refresh token for later use
+                geyser.saveRefreshToken(name(), service.getRefreshToken());
                 return true;
             }
         }
@@ -955,11 +1013,16 @@ public class GeyserSession implements GeyserConnection, CommandSender {
             loggedIn = false;
             if (downstream != null) {
                 downstream.disconnect(reason);
+            } else {
+                // Downstream's disconnect will fire an event that prints a log message
+                // Otherwise, we print a message here
+                InetAddress address = upstream.getAddress().getAddress();
+                geyser.getLogger().info(GeyserLocale.getLocaleStringLog("geyser.network.disconnect", address, reason));
             }
-            if (upstream != null && !upstream.isClosed()) {
-                geyser.getSessionManager().removeSession(this);
+            if (!upstream.isClosed()) {
                 upstream.disconnect(reason);
             }
+            geyser.getSessionManager().removeSession(this);
             if (authData != null) {
                 PendingMicrosoftAuthentication.AuthenticationTask task = geyser.getPendingMicrosoftAuthentication().getTask(authData.xuid());
                 if (task != null) {
