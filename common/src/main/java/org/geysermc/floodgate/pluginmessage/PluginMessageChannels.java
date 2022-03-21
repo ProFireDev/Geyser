@@ -23,46 +23,23 @@
  * @link https://github.com/GeyserMC/Geyser
  */
 
-package org.geysermc.api.session;
+package org.geysermc.floodgate.pluginmessage;
 
-import org.checkerframework.checker.nullness.qual.NonNull;
-import org.checkerframework.common.value.qual.IntRange;
+import com.google.common.base.Charsets;
 
-import java.util.UUID;
+public final class PluginMessageChannels {
+    public static final String SKIN = "floodgate:skin";
+    public static final String FORM = "floodgate:form";
+    public static final String TRANSFER = "floodgate:transfer";
 
-/**
- * Represents a player connection.
- */
-@NonNull
-public interface Connection {
-    /**
-     * Gets the name of the connection.
-     *
-     * @return the name of the connection
-     */
-    String name();
+    private static final byte[] FLOODGATE_REGISTER_DATA = String.join("\0", SKIN, FORM, TRANSFER).getBytes(Charsets.UTF_8);
 
     /**
-     * Gets the {@link UUID} of the connection.
+     * Get the prebuilt register data as a byte array
      *
-     * @return the UUID of the connection
+     * @return the register data of the Floodgate channels
      */
-    UUID uuid();
-
-    /**
-     * Gets the XUID of the connection.
-     *
-     * @return the XUID of the connection
-     */
-    String xuid();
-
-    /**
-     * Transfer the connection to a server. A Bedrock player can successfully transfer to the same server they are
-     * currently playing on.
-     *
-     * @param address The address of the server
-     * @param port The port of the server
-     * @return true if the transfer was a success
-     */
-    boolean transfer(@NonNull String address, @IntRange(from = 0, to = 65535) int port);
+    public static byte[] getFloodgateRegisterData() {
+        return FLOODGATE_REGISTER_DATA;
+    }
 }
